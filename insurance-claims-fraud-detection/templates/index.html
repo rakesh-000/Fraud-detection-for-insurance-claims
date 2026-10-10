@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ClaimsGuard | Insurance Fraud Detection</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand-mark">CG</div>
+    <div><strong>ClaimsGuard</strong><span>Insurance Claims Intelligence</span></div>
+    <div class="status"><i></i> Local demo</div>
+  </header>
+  <main class="container">
+    <section class="hero">
+      <div>
+        <p class="eyebrow">FRAUD ANALYTICS PLATFORM</p>
+        <h1>Assess claims.<br><em>Surface risk.</em></h1>
+        <p class="hero-copy">A machine-learning screening tool that helps prioritize insurance claims for human review.</p>
+      </div>
+      <div class="hero-stat"><span>MODEL</span><strong>Random Forest</strong><small>Supervised classification</small></div>
+    </section>
+
+    <section class="grid">
+      <div class="panel form-panel">
+        <div class="panel-heading"><div><p class="eyebrow">CLAIM INTAKE</p><h2>Analyze a claim</h2></div><span class="step">01 / 02</span></div>
+        <form id="claim-form">
+          <div class="fields">
+            <label>Claim amount (₹)<input name="claim_amount" type="number" min="0" value="25000" required></label>
+            <label>Policy age (days)<input name="policy_age_days" type="number" min="0" value="365" required></label>
+            <label>Claim delay (days)<input name="claim_delay_days" type="number" min="0" value="12" required></label>
+            <label>Incident hour (0–23)<input name="incident_hour" type="number" min="0" max="23" value="18" required></label>
+            <label>Previous claims<input name="num_previous_claims" type="number" min="0" value="2" required></label>
+            <label>Vehicle age (years)<input name="vehicle_age" type="number" min="0" value="5" required></label>
+            <label>Claim type<select name="claim_type"><option value="collision">Collision</option><option value="theft">Theft</option><option value="medical">Medical</option><option value="property">Property</option></select></label>
+            <label>Incident location<select name="incident_location"><option value="urban">Urban</option><option value="rural">Rural</option><option value="highway">Highway</option></select></label>
+            <label>Police report<select name="police_report"><option value="yes">Yes</option><option value="no">No</option></select></label>
+            <label>Witness present<select name="witness_present"><option value="yes">Yes</option><option value="no">No</option></select></label>
+          </div>
+          <button type="submit" id="submit">Run fraud assessment <span>↗</span></button>
+          <p id="form-message" class="form-message">Submit claim details to generate a model-based screening result.</p>
+        </form>
+      </div>
+      <div class="panel result-panel">
+        <div class="panel-heading"><div><p class="eyebrow">ASSESSMENT OUTPUT</p><h2>Risk summary</h2></div><span class="live-tag">● LIVE</span></div>
+        <div id="result-empty" class="empty-state"><div class="target">◎</div><h3>Awaiting claim data</h3><p>Your prediction and risk indicators will appear here after analysis.</p></div>
+        <div id="result" hidden>
+          <div class="result-banner"><span id="result-label">Prediction</span><strong id="result-risk">—</strong></div>
+          <div class="probability"><div><span>Fraud probability</span><strong id="probability">0%</strong></div><div class="bar"><span id="probability-bar"></span></div></div>
+          <div class="result-details"><div><span>Risk level</span><strong id="risk-level">—</strong></div><div><span>Decision threshold</span><strong id="threshold-value">50%</strong></div></div>
+          <p class="notice" id="result-note"></p>
+        </div>
+        <div class="threshold-box"><label for="threshold">Decision threshold <strong id="threshold-label">50%</strong></label><input id="threshold" type="range" min="0.1" max="0.9" step="0.05" value="0.5"><button class="secondary" id="save-threshold" type="button">Update threshold</button></div>
+      </div>
+    </section>
+
+    <section class="panel metrics-panel">
+      <div class="panel-heading"><div><p class="eyebrow">MODEL MONITORING</p><h2>Evaluation metrics</h2></div><button class="secondary" id="refresh-metrics">Refresh metrics</button></div>
+      <div id="metrics" class="metric-grid"><div class="metric"><span>Accuracy</span><strong>—</strong></div><div class="metric"><span>Precision</span><strong>—</strong></div><div class="metric"><span>Recall</span><strong>—</strong></div><div class="metric"><span>F1-score</span><strong>—</strong></div><div class="metric"><span>ROC-AUC</span><strong>—</strong></div></div>
+      <p class="subtle">Metrics are computed on a held-out test split. Synthetic demo data does not represent real-world performance.</p>
+    </section>
+
+    <section class="panel history-panel">
+      <div class="panel-heading"><div><p class="eyebrow">AUDIT TRAIL</p><h2>Recent predictions</h2></div><button class="secondary" id="refresh-history">Refresh history</button></div>
+      <div class="table-wrap"><table><thead><tr><th>Timestamp</th><th>Prediction</th><th>Probability</th><th>Risk</th></tr></thead><tbody id="history"><tr><td colspan="4">No predictions recorded yet.</td></tr></tbody></table></div>
+    </section>
+    <footer>ClaimsGuard · Educational prototype · Human review required for claim decisions</footer>
+  </main>
+<script>
+const form = document.getElementById('claim-form');
+const message = document.getElementById('form-message');
+const threshold = document.getElementById('threshold');
+threshold.addEventListener('input', () => document.getElementById('threshold-label').textContent = Math.round(Number(threshold.value)*100)+'%');
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(form).entries());
+  for (const k of ['claim_amount','policy_age_days','claim_delay_days','incident_hour','num_previous_claims','vehicle_age']) data[k] = Number(data[k]);
+  const btn = document.getElementById('submit'); btn.disabled = true; btn.textContent = 'Analyzing claim…';
+  try {
+    const res = await fetch('/api/predict',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+    const out = await res.json(); if(!res.ok) throw new Error(out.error || 'Prediction failed');
+    document.getElementById('result-empty').hidden = true; document.getElementById('result').hidden = false;
+    document.getElementById('result-label').textContent = out.prediction;
+    document.getElementById('result-risk').textContent = out.risk_level + ' risk';
+    document.getElementById('probability').textContent = (out.fraud_probability*100).toFixed(1)+'%';
+    document.getElementById('probability-bar').style.width = (out.fraud_probability*100)+'%';
+    document.getElementById('risk-level').textContent = out.risk_level;
+    document.getElementById('threshold-value').textContent = (out.threshold*100).toFixed(0)+'%';
+    document.getElementById('result-note').textContent = out.note;
+    message.textContent = 'Assessment complete. Review the result before taking action.';
+    await refreshHistory();
+  } catch(err) { message.textContent = err.message; }
+  finally { btn.disabled = false; btn.innerHTML = 'Run fraud assessment <span>↗</span>'; }
+});
+document.getElementById('save-threshold').addEventListener('click', async () => {
+  const res = await fetch('/api/threshold',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({threshold:Number(threshold.value)})});
+  const out = await res.json(); message.textContent = out.message || out.error;
+});
+async function refreshMetrics(){
+  const res=await fetch('/api/metrics'); const m=await res.json();
+  if(!res.ok) return;
+  const items=[['Accuracy',m.accuracy],['Precision',m.precision],['Recall',m.recall],['F1-score',m.f1_score],['ROC-AUC',m.roc_auc]];
+  document.getElementById('metrics').innerHTML=items.map(([n,v])=>`<div class="metric"><span>${n}</span><strong>${(v*100).toFixed(1)}%</strong></div>`).join('');
+}
+async function refreshHistory(){
+  const res=await fetch('/api/history'); const rows=await res.json();
+  document.getElementById('history').innerHTML=rows.length?rows.map(r=>`<tr><td>${String(r.timestamp).replace('T',' ').slice(0,19)}</td><td>${r.prediction}</td><td>${(Number(r.fraud_probability)*100).toFixed(1)}%</td><td><span class="risk-pill">${r.risk_level}</span></td></tr>`).join(''):'<tr><td colspan="4">No predictions recorded yet.</td></tr>';
+}
+document.getElementById('refresh-metrics').addEventListener('click',refreshMetrics);
+document.getElementById('refresh-history').addEventListener('click',refreshHistory);
+refreshMetrics(); refreshHistory();
+</script>
+</body></html>

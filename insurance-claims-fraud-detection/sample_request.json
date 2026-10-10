@@ -1,0 +1,12 @@
+{
+  "claim_amount": 25000,
+  "policy_age_days": 365,
+  "claim_delay_days": 12,
+  "incident_hour": 18,
+  "num_previous_claims": 2,
+  "vehicle_age": 5,
+  "claim_type": "collision",
+  "incident_location": "urban",
+  "police_report": "yes",
+  "witness_present": "no"
+}
